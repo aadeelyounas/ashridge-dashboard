@@ -26,6 +26,7 @@ interface PipelineItem {
   assignedTo: string;
   due: string;
   notes: string;
+  content?: string;
 }
 
 interface GeoScore {
@@ -626,6 +627,26 @@ export default function DashboardPage() {
                     <div className="modal-value">{value}</div>
                   </div>
                 ))}
+
+              {selectedItem?.content && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.8px" }}>Draft Content</div>
+                  <div style={{
+                    background: "var(--surface2)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    padding: "16px",
+                    fontSize: 13,
+                    lineHeight: 1.7,
+                    maxHeight: 400,
+                    overflowY: "auto",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}>
+                    {selectedItem.content}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

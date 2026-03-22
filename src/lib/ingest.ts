@@ -58,32 +58,59 @@ function parseMdTable(text: string, tableIndex = 0) {
 
 // ── Ingest: Content Queue ──────────────────────────────────────────────────────
 
+// Build a slug → content map from Oliver's draft files
+function readDrafts(): Record<string, string> {
+  const drafts: Record<string, string> = {};
+  const draftsDir = path.join(ASHRIDGE_ROOT, "agents/oliver/memory/drafts");
+  try {
+    for (const file of fs.readdirSync(draftsDir)) {
+      if (file.endsWith(".md")) {
+        const slug = file.replace(/\.md$/, "");
+        drafts[slug] = fs.readFileSync(path.join(draftsDir, file), "utf8");
+      }
+    }
+  } catch {
+    // No drafts dir yet
+  }
+  return drafts;
+}
+
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 async function ingestContentQueue() {
   const md = read("intel/CONTENT-QUEUE.md");
   if (!md) { console.log("No CONTENT-QUEUE.md found"); return; }
 
+  const drafts = readDrafts();
   const rows = parseMdTable(md).filter((r) => r["Page Title"] || r["Title"]);
-
-  for (const row of rows) {
-    const existing = await db.select().from(contentQueue).limit(1);
-    // Upsert logic: clear and re-insert for now (replace all each run)
-  }
 
   // Clear and re-insert for simplicity
   await db.delete(contentQueue);
 
+  let withContent = 0;
   for (const row of rows) {
+    const title = row["Page Title"] || row["Title"] || "";
+    const slug = `2026-03-22-${slugify(title)}`;
+    const content = drafts[slug] || null;
+
     await db.insert(contentQueue).values({
-      pageTitle: row["Page Title"] || row["Title"] || "",
+      pageTitle: title,
       targetKeyword: row["Target Keyword"] || "",
       priority: row["Priority"] || "MED",
       status: row["Status"] || row["Stage"] || "Not started",
       assignedTo: row["Assigned To"] || "",
       due: row["Due"] || "",
       notes: row["Notes"] || "",
+      content: content,
     });
+    if (content) withContent++;
   }
-  console.log(`  Content queue: ${rows.length} rows`);
+  console.log(`  Content queue: ${rows.length} rows (${withContent} with draft content)`);
 }
 
 // ── Ingest: GEO Intel ─────────────────────────────────────────────────────────

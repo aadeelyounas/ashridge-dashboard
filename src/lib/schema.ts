@@ -9,6 +9,7 @@ export const contentQueue = pgTable("content_queue", {
   assignedTo: text("assigned_to"),
   due: text("due"),
   notes: text("notes"),
+  content: text("content"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
