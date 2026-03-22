@@ -17,7 +17,7 @@ if (!DATABASE_URL) {
 const sql = neon(DATABASE_URL);
 const db = drizzle(sql);
 
-const ASHRIDGE_ROOT = "/root/.openclaw/workspace/workspace/ashridge";
+const ASHRIDGE_ROOT = "/root/.openclaw/workspace/ashridge";
 const SQUAD_ROOT = "/root/.openclaw/workspace";
 const LOCATIONS = ["London", "Milton Keynes", "Weybridge", "Basingstoke", "Manchester", "Scotland"];
 
@@ -39,12 +39,16 @@ function readIntel(file: string) {
   }
 }
 
-function parseMdTable(text: string) {
+function parseMdTable(text: string, tableIndex = 0) {
   if (!text) return [];
-  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#") && !l.startsWith("|---"));
-  if (lines.length < 2) return [];
-  const headers = lines[0].split("|").map((h) => h.trim()).filter(Boolean);
-  return lines.slice(1).map((line) => {
+  // Only include lines that start with | (actual table rows)
+  const allLines = text.split("\n").map((l) => l.trim()).filter((l) => l && l.startsWith("|") && !l.startsWith("|---"));
+  if (allLines.length < 2) return [];
+  // Skip header rows (lines ending in |) until we hit the column header row
+  const headerIdx = allLines.findIndex((l) => l.split("|").filter(Boolean).length >= 3);
+  if (headerIdx < 0 || headerIdx >= allLines.length - 1) return [];
+  const headers = allLines[headerIdx].split("|").map((h) => h.trim()).filter(Boolean);
+  return allLines.slice(headerIdx + 1).map((line) => {
     const cells = line.split("|").map((c) => c.trim()).filter(Boolean);
     const row: Record<string, string> = {};
     headers.forEach((h, i) => (row[h] = cells[i] || ""));
@@ -85,6 +89,7 @@ async function ingestContentQueue() {
 // ── Ingest: GEO Intel ─────────────────────────────────────────────────────────
 
 async function ingestGeo() {
+  await db.delete(geoScores);
   const md = read("intel/GEO-INTEL.md");
   if (!md) { console.log("No GEO-INTEL.md found"); return; }
 
@@ -106,6 +111,7 @@ async function ingestAgentActivity(agentId: string, agentName: string, action: s
 // ── Ingest: Local SEO ─────────────────────────────────────────────────────────
 
 async function ingestLocalSeo() {
+  await db.delete(localSeoTracker);
   const md = read("agents/marcus/memory/local-seo-tracker.md");
   if (!md) { console.log("No local-seo-tracker.md found"); return; }
 
@@ -130,6 +136,7 @@ async function ingestLocalSeo() {
 // ── Ingest: Intel Items ───────────────────────────────────────────────────────
 
 async function ingestIntel() {
+  await db.delete(intelItems);
   const md = readIntel("intel/DAILY-INTEL.md");
   if (!md) { console.log("No DAILY-INTEL.md found"); return; }
 

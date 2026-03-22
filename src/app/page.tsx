@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 interface PipelineItem {
   id: number;
-  page_title: string;
+  pageTitle: string;
   target_keyword: string;
   priority: string;
   status: string;
@@ -177,8 +177,8 @@ export default function DashboardPage() {
                         {pipeline.map((item) => (
                           <tr key={item.id} onClick={() => setSelectedItem(item)}>
                             <td>
-                              <div style={{ fontWeight: 600 }}>{item.page_title || "(untitled)"}</div>
-                              <div style={{ color: "var(--muted)", fontSize: 12 }}>{item.target_keyword}</div>
+                              <div style={{ fontWeight: 600 }}>{item.pageTitle || "(untitled)"}</div>
+                              <div style={{ color: "var(--muted)", fontSize: 12 }}>{item.targetKeyword}</div>
                             </td>
                             <td>
                               <span className={`tag ${priorityClass(item.priority)}`}>{item.priority}</span>
@@ -297,7 +297,7 @@ export default function DashboardPage() {
         <div className={`modal-overlay ${selectedItem ? "open" : ""}`} onClick={() => setSelectedItem(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title">{selectedItem?.page_title || "Article"}</div>
+              <div className="modal-title">{selectedItem?.pageTitle || "Article"}</div>
               <button className="modal-close" onClick={() => setSelectedItem(null)}>×</button>
             </div>
             <div className="modal-body">
