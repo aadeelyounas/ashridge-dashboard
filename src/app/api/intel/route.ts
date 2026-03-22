@@ -1,13 +1,18 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { intelItems } from "@/lib/schema";
-import { proxyAuth } from "@/lib/proxy";
 import { desc } from "drizzle-orm";
 
-export async function GET(req: Request) {
-  const auth = proxyAuth(req);
-  if (auth) return auth;
-  const rows = await db.select().from(intelItems).orderBy(desc(intelItems.recordedAt));
-  return NextResponse.json(rows);
+export async function GET() {
+  try {
+    const rows = await db
+      .select()
+      .from(intelItems)
+      .orderBy(desc(intelItems.recordedAt));
+    return NextResponse.json(rows);
+  } catch (e) {
+    console.error("intel GET error:", e);
+    return NextResponse.json({ error: "Failed to fetch intel items" }, { status: 500 });
+  }
 }

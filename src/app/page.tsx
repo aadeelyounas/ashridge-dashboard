@@ -1,14 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Building2,
+  FileText,
+  CheckCircle2,
+  Bot,
+  Globe,
+  ClipboardList,
+  MapPin,
+  Brain,
+  Inbox,
+  Search,
+  X,
+} from "lucide-react";
+
+/* ── Types ──────────────────────────────────────────────────────────── */
 
 interface PipelineItem {
   id: number;
   pageTitle: string;
-  target_keyword: string;
+  targetKeyword: string;
   priority: string;
   status: string;
-  assigned_to: string;
+  assignedTo: string;
   due: string;
   notes: string;
 }
@@ -23,8 +38,8 @@ interface GeoScore {
 
 interface AgentActivity {
   id: number;
-  agent_id: string;
-  agent_name: string;
+  agentId: string;
+  agentName: string;
   action: string;
   details: string;
   ranAt: string;
@@ -33,31 +48,71 @@ interface AgentActivity {
 interface LocalSeo {
   id: number;
   location: string;
-  gbp_post: boolean;
-  review_count: number;
+  gbpPost: boolean;
+  reviewCount: number;
   trackedAt: string;
 }
 
+interface IntelItem {
+  id: number;
+  section: string;
+  topic: string;
+  summary: string | null;
+  source: string | null;
+  priority: string;
+  recordedAt: string;
+}
+
+/* ── Constants ──────────────────────────────────────────────────────── */
+
 const AGENTS = [
-  { id: "victoria", name: "Victoria", role: "SEO & GEO Lead", color: "#6c8cff" },
-  { id: "atlas", name: "Atlas", role: "Topical Map Builder", color: "#c084fc" },
-  { id: "quinn", name: "Quinn", role: "Query Gap Analyst", color: "#ffc04d" },
-  { id: "aria", name: "Aria", role: "Content Auditor", color: "#4ade80" },
-  { id: "oliver", name: "Oliver", role: "Content Writer", color: "#ff6b6b" },
-  { id: "sophie", name: "Sophie", role: "Brand Voice", color: "#db2777" },
+  { id: "victoria", name: "Victoria", role: "SEO & GEO Lead", color: "#2563eb" },
+  { id: "atlas", name: "Atlas", role: "Topical Map Builder", color: "#8b5cf6" },
+  { id: "quinn", name: "Quinn", role: "Query Gap Analyst", color: "#f59e0b" },
+  { id: "aria", name: "Aria", role: "Content Auditor", color: "#22c55e" },
+  { id: "oliver", name: "Oliver", role: "Content Writer", color: "#ef4444" },
+  { id: "sophie", name: "Sophie", role: "Brand Voice", color: "#ec4899" },
   { id: "grace", name: "Grace", role: "GEO / AI Visibility", color: "#3b82f6" },
-  { id: "marcus", name: "Marcus", role: "Local SEO", color: "#ffc04d" },
+  { id: "marcus", name: "Marcus", role: "Local SEO", color: "#f97316" },
 ];
 
-const LOCATIONS = ["London", "Milton Keynes", "Weybridge", "Basingstoke", "Manchester", "Scotland"];
+const LOCATIONS = [
+  "London",
+  "Milton Keynes",
+  "Weybridge",
+  "Basingstoke",
+  "Manchester",
+  "Scotland",
+];
+
+/* ── Helpers ─────────────────────────────────────────────────────────── */
+
+/** Strip emoji characters from database strings (no-emoji-icons rule) */
+function stripEmoji(str: string) {
+  return str
+    .replace(
+      /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2B50}\u{FE0F}\u{200D}\u{20E3}\u{2705}\u{231A}-\u{231B}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{25AA}-\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}]/gu,
+      ""
+    )
+    .trim();
+}
 
 function stageClass(status: string) {
   const s = status.toLowerCase();
   if (s.includes("publish")) return "stage-published";
-  if (s.includes("adeel") || s.includes("victoria")) return "stage-review";
-  if (s.includes("sophie")) return "stage-review";
+  if (
+    s.includes("adeel") ||
+    s.includes("victoria") ||
+    s.includes("sophie")
+  )
+    return "stage-review";
   if (s.includes("aria") || s.includes("audit")) return "stage-audit";
-  if (s.includes("oliver") || s.includes("draft") || s.includes("writing")) return "stage-writing";
+  if (
+    s.includes("oliver") ||
+    s.includes("draft") ||
+    s.includes("writing")
+  )
+    return "stage-writing";
   return "stage-queuing";
 }
 
@@ -68,123 +123,284 @@ function priorityClass(p: string) {
   return "tag-med";
 }
 
+function timeAgo(dateStr: string) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+/* ── GEO Progress Ring ───────────────────────────────────────────────── */
+
+function GeoRing({ score, max = 100 }: { score: number; max?: number }) {
+  const radius = 66;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.min(score / max, 1);
+  const offset = circumference * (1 - pct);
+
+  return (
+    <div className="geo-ring-wrapper" role="img" aria-label={`GEO score: ${score} out of ${max}`}>
+      <svg className="geo-ring" viewBox="0 0 160 160" aria-hidden="true">
+        <defs>
+          <linearGradient id="geoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#2563eb" />
+            <stop offset="50%" stopColor="#8b5cf6" />
+            <stop offset="100%" stopColor="#22c55e" />
+          </linearGradient>
+        </defs>
+        <circle className="geo-ring-bg" cx="80" cy="80" r={radius} />
+        <circle
+          className="geo-ring-fill"
+          cx="80"
+          cy="80"
+          r={radius}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="geo-value">
+        <div className="number">{score}</div>
+        <div className="label">out of {max}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main Component ──────────────────────────────────────────────────── */
+
 export default function DashboardPage() {
   const [pipeline, setPipeline] = useState<PipelineItem[]>([]);
   const [geo, setGeo] = useState<GeoScore[]>([]);
   const [agents, setAgents] = useState<AgentActivity[]>([]);
   const [seo, setSeo] = useState<LocalSeo[]>([]);
+  const [intel, setIntel] = useState<IntelItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function fetchAll() {
     try {
-      const [p, g, a, s] = await Promise.all([
+      const [p, g, a, s, i] = await Promise.all([
         fetch("/api/pipeline").then((r) => r.json()),
         fetch("/api/geo").then((r) => r.json()),
         fetch("/api/agents").then((r) => r.json()),
         fetch("/api/seo").then((r) => r.json()),
+        fetch("/api/intel").then((r) => r.json()),
       ]);
-      setPipeline(p);
-      setGeo(g);
-      setAgents(a);
-      setSeo(s);
+      setPipeline(Array.isArray(p) ? p : []);
+      setGeo(Array.isArray(g) ? g : []);
+      setAgents(Array.isArray(a) ? a : []);
+      setSeo(Array.isArray(s) ? s : []);
+      setIntel(Array.isArray(i) ? i : []);
     } catch (e) {
-      console.error(e);
+      console.error("Dashboard fetch error:", e);
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
   useEffect(() => {
     const id = setInterval(fetchAll, 60000);
     return () => clearInterval(id);
   }, []);
 
   const latestGeo = geo[geo.length - 1];
+  const publishedCount = pipeline.filter(
+    (p) => p.status?.toLowerCase().includes("publish")
+  ).length;
+  const uniqueAgents = new Set(agents.map((a) => a.agentId)).size;
+  const maxReviews = Math.max(...seo.map((s) => s.reviewCount || 0), 1);
 
   return (
     <div className="dashboard-layout">
-      {/* Sidebar */}
-      <aside className="sidebar">
+      {/* ── Sidebar ────────────────────────────────────────────── */}
+      <aside className="sidebar" aria-label="Main navigation">
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">🏢</div>
+          <div className="sidebar-logo-icon" aria-hidden="true">
+            <Building2 size={20} strokeWidth={1.75} />
+          </div>
           <div>
             <div className="sidebar-logo-text">Ashridge Group</div>
             <div className="sidebar-logo-sub">SEO / GEO Dashboard</div>
           </div>
         </div>
 
-        <div className="nav-section">
-          <div className="nav-label">Operations</div>
-          <a href="#pipeline" className="nav-link active">📋 Content Pipeline</a>
-          <a href="#geo" className="nav-link">🌍 GEO Score</a>
-          <a href="#seo" className="nav-link">📍 Local SEO</a>
-          <a href="#agents" className="nav-link">🤖 Agent Activity</a>
-        </div>
+        <nav className="nav-section" aria-label="Operations navigation">
+          <div className="nav-label" id="nav-ops-label">Operations</div>
+          <div role="list" aria-labelledby="nav-ops-label">
+            <a href="#pipeline" className="nav-link active" role="listitem">
+              <ClipboardList aria-hidden="true" /> Content Pipeline
+            </a>
+            <a href="#geo" className="nav-link" role="listitem">
+              <Globe aria-hidden="true" /> GEO Score
+            </a>
+            <a href="#seo" className="nav-link" role="listitem">
+              <MapPin aria-hidden="true" /> Local SEO
+            </a>
+            <a href="#agents" className="nav-link" role="listitem">
+              <Bot aria-hidden="true" /> Agent Activity
+            </a>
+            <a href="#intel" className="nav-link" role="listitem">
+              <Brain aria-hidden="true" /> Intel Feed
+            </a>
+          </div>
+        </nav>
 
         <div className="nav-section">
           <div className="nav-label">Team</div>
           {AGENTS.map((ag) => (
-            <div key={ag.id} className="nav-link" style={{ opacity: 0.7, fontSize: 12 }}>
-              <span className="nav-dot" style={{ background: ag.color }} />
+            <div
+              key={ag.id}
+              className="nav-link"
+              style={{ opacity: 0.85, fontSize: 12 }}
+            >
+              <span
+                className="nav-dot"
+                style={{ background: ag.color }}
+                aria-hidden="true"
+              />
               {ag.name} — {ag.role}
             </div>
           ))}
         </div>
 
-        <div style={{ marginTop: "auto", paddingTop: 24, fontSize: 11, color: "var(--muted)" }}>
-          Auto-refresh: 60s<br />
-          Data: Neon PostgreSQL
+        <div className="sidebar-footer">
+          <div className="status-indicator">
+            <span className="status-dot" aria-hidden="true" />
+            <span>Auto-refresh: 60s</span>
+          </div>
+          <div style={{ marginTop: 4 }}>Data: Neon PostgreSQL</div>
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="main-content">
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Ashridge Dashboard</h1>
-          <p style={{ color: "var(--muted)", fontSize: 13 }}>
-            {new Date().toLocaleDateString("en-GB", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+      {/* ── Main ───────────────────────────────────────────────── */}
+      <main className="main-content" id="main-content">
+        <div className="page-header">
+          <h1>Ashridge Dashboard</h1>
+          <p>
+            {new Date().toLocaleDateString("en-GB", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
           </p>
         </div>
 
         {loading ? (
-          <div style={{ color: "var(--muted)", padding: 40, textAlign: "center" }}>Loading...</div>
+          <div className="skeleton" aria-label="Loading dashboard data">
+            <div className="skeleton-row">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="skeleton-kpi" />
+              ))}
+            </div>
+            <div className="skeleton-card" />
+            <div className="skeleton-card" style={{ height: 160 }} />
+          </div>
         ) : (
           <>
-            {/* Content Pipeline */}
-            <section id="pipeline">
-              <div className="card">
+            {/* ── KPI Cards ──────────────────────────────────── */}
+            <div className="kpi-grid" role="list" aria-label="Key metrics">
+              <div className="kpi-card" role="listitem">
+                <div className="kpi-icon kpi-icon--blue" aria-hidden="true">
+                  <FileText />
+                </div>
+                <div className="kpi-value">{pipeline.length}</div>
+                <div className="kpi-label">Total Pages</div>
+              </div>
+              <div className="kpi-card" role="listitem">
+                <div className="kpi-icon kpi-icon--green" aria-hidden="true">
+                  <CheckCircle2 />
+                </div>
+                <div className="kpi-value">{publishedCount}</div>
+                <div className="kpi-label">Published</div>
+              </div>
+              <div className="kpi-card" role="listitem">
+                <div className="kpi-icon kpi-icon--purple" aria-hidden="true">
+                  <Bot />
+                </div>
+                <div className="kpi-value">{uniqueAgents}</div>
+                <div className="kpi-label">Active Agents</div>
+              </div>
+              <div className="kpi-card" role="listitem">
+                <div className="kpi-icon kpi-icon--amber" aria-hidden="true">
+                  <Globe />
+                </div>
+                <div className="kpi-value">{latestGeo?.score ?? "—"}</div>
+                <div className="kpi-label">GEO Score</div>
+              </div>
+            </div>
+
+            {/* ── Content Pipeline ────────────────────────────── */}
+            <section id="pipeline" aria-labelledby="pipeline-title">
+              <div className="card" style={{ animationDelay: "100ms" }}>
                 <div className="card-header">
-                  <span className="card-title">Content Pipeline</span>
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{pipeline.length} pages</span>
+                  <span className="card-title" id="pipeline-title">
+                    <ClipboardList aria-hidden="true" /> Content Pipeline
+                  </span>
+                  <span className="card-badge">{pipeline.length} pages</span>
                 </div>
                 <div className="card-body" style={{ padding: 0 }}>
                   {pipeline.length === 0 ? (
-                    <div style={{ padding: "40px 18px", textAlign: "center", color: "var(--muted)" }}>
+                    <div className="empty-state">
+                      <div className="empty-icon">
+                        <Inbox />
+                      </div>
                       No pages in queue — Victoria sets priorities each Monday
                     </div>
                   ) : (
-                    <table className="pipeline-table">
+                    <table className="pipeline-table" aria-label="Content pipeline items">
                       <thead>
                         <tr>
-                          <th>Page</th>
-                          <th>Priority</th>
-                          <th>Stage</th>
+                          <th scope="col">Page</th>
+                          <th scope="col">Priority</th>
+                          <th scope="col">Stage</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pipeline.map((item) => (
-                          <tr key={item.id} onClick={() => setSelectedItem(item)}>
+                          <tr
+                            key={item.id}
+                            onClick={() => setSelectedItem(item)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedItem(item);
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`View details for ${item.pageTitle || "untitled"}`}
+                          >
                             <td>
-                              <div style={{ fontWeight: 600 }}>{item.pageTitle || "(untitled)"}</div>
-                              <div style={{ color: "var(--muted)", fontSize: 12 }}>{item.targetKeyword}</div>
+                              <div className="page-title">
+                                {item.pageTitle || "(untitled)"}
+                              </div>
+                              <div className="page-keyword">
+                                {item.targetKeyword}
+                              </div>
                             </td>
                             <td>
-                              <span className={`tag ${priorityClass(item.priority)}`}>{item.priority}</span>
+                              <span
+                                className={`tag ${priorityClass(item.priority)}`}
+                              >
+                                {item.priority}
+                              </span>
                             </td>
                             <td>
-                              <span className={`stage ${stageClass(item.status)}`}>{item.status}</span>
+                              <span
+                                className={`stage ${stageClass(item.status)}`}
+                              >
+                                {stripEmoji(item.status)}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -195,55 +411,71 @@ export default function DashboardPage() {
               </div>
             </section>
 
-            {/* GEO + Stats row */}
+            {/* ── GEO + Agents Row ─────────────────────────────── */}
             <div className="grid-2" style={{ marginBottom: 24 }}>
-              {/* GEO Score */}
-              <section id="geo">
-                <div className="card">
+              <section id="geo" aria-labelledby="geo-title">
+                <div className="card" style={{ animationDelay: "200ms" }}>
                   <div className="card-header">
-                    <span className="card-title">🌍 GEO / AI Visibility</span>
+                    <span className="card-title" id="geo-title">
+                      <Globe aria-hidden="true" /> GEO / AI Visibility
+                    </span>
                   </div>
-                  <div className="card-body" style={{ textAlign: "center", padding: "2rem" }}>
+                  <div className="card-body">
                     {latestGeo ? (
-                      <>
-                        <div className="geo-big">
-                          {latestGeo.score}<span>/100</span>
-                        </div>
-                        <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 8 }}>
-                          Baseline: {latestGeo.baseline} &nbsp;|&nbsp;
+                      <div className="geo-container">
+                        <GeoRing score={latestGeo.score} />
+                        <div className="geo-meta">
+                          Baseline: <strong>{latestGeo.baseline}</strong>{" "}
+                          &nbsp;·&nbsp;
                           {latestGeo.location}
                         </div>
-                      </>
+                      </div>
                     ) : (
-                      <div style={{ color: "var(--muted)", padding: "2rem" }}>No GEO data yet — Grace is running baseline audit</div>
+                      <div className="empty-state">
+                        <div className="empty-icon">
+                          <Search />
+                        </div>
+                        No GEO data yet — Grace is running baseline audit
+                      </div>
                     )}
                   </div>
                 </div>
               </section>
 
-              {/* Agent Activity */}
-              <section id="agents">
-                <div className="card">
+              <section id="agents" aria-labelledby="agents-title">
+                <div className="card" style={{ animationDelay: "250ms" }}>
                   <div className="card-header">
-                    <span className="card-title">🤖 Agent Activity</span>
+                    <span className="card-title" id="agents-title">
+                      <Bot aria-hidden="true" /> Agent Activity
+                    </span>
+                    <span className="card-badge">{agents.length} events</span>
                   </div>
                   <div className="card-body">
                     {agents.length === 0 ? (
-                      <div style={{ color: "var(--muted)" }}>No recent activity</div>
+                      <div className="empty-state">
+                        <div className="empty-icon">
+                          <Bot />
+                        </div>
+                        No recent activity
+                      </div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {agents.slice(-8).reverse().map((ag) => (
-                          <div key={ag.id} style={{ display: "flex", gap: 12, fontSize: 13, alignItems: "center" }}>
-                            <span style={{
-                              width: 8, height: 8, borderRadius: "50%",
-                              background: AGENTS.find((a) => a.id === ag.agent_id)?.color || "var(--muted)",
-                              flexShrink: 0,
-                            }} />
-                            <span style={{ fontWeight: 600, minWidth: 80 }}>{ag.agent_name}</span>
-                            <span style={{ color: "var(--muted)" }}>{ag.action}</span>
-                            <span style={{ color: "var(--muted)", marginLeft: "auto", fontSize: 11 }}>
-                              {new Date(ag.ranAt).toLocaleTimeString()}
-                            </span>
+                      <div className="agent-timeline" role="list" aria-label="Recent agent activity">
+                        {agents.slice(0, 8).map((ag) => (
+                          <div key={ag.id} className="agent-entry" role="listitem">
+                            <span
+                              className="agent-dot"
+                              style={{
+                                background:
+                                  AGENTS.find((a) => a.id === ag.agentId)
+                                    ?.color || "var(--text-muted)",
+                              }}
+                              aria-hidden="true"
+                            />
+                            <span className="agent-name">{ag.agentName}</span>
+                            <span className="agent-action">{ag.action}</span>
+                            <time className="agent-time" dateTime={ag.ranAt}>
+                              {timeAgo(ag.ranAt)}
+                            </time>
                           </div>
                         ))}
                       </div>
@@ -253,35 +485,56 @@ export default function DashboardPage() {
               </section>
             </div>
 
-            {/* Local SEO */}
-            <section id="seo">
-              <div className="card">
+            {/* ── Local SEO ────────────────────────────────────── */}
+            <section id="seo" aria-labelledby="seo-title">
+              <div className="card" style={{ animationDelay: "300ms" }}>
                 <div className="card-header">
-                  <span className="card-title">📍 Local SEO — GBP</span>
+                  <span className="card-title" id="seo-title">
+                    <MapPin aria-hidden="true" /> Local SEO — GBP
+                  </span>
+                  <span className="card-badge">
+                    {LOCATIONS.length} locations
+                  </span>
                 </div>
                 <div className="card-body">
-                  <div className="grid-3">
+                  <div className="seo-grid" role="list" aria-label="Local SEO by location">
                     {LOCATIONS.map((loc) => {
                       const entry = seo.find((s) => s.location === loc);
                       return (
-                        <div key={loc} style={{
-                          background: "var(--surface2)",
-                          borderRadius: 8,
-                          padding: "12px 16px",
-                          border: "1px solid var(--border)",
-                        }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>{loc}</div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
-                            <div>
-                              <span style={{ color: "var(--muted)" }}>GBP post: </span>
-                              <span style={{ color: entry?.gbp_post ? "var(--green)" : "var(--muted)" }}>
-                                {entry?.gbp_post ? "✅ Yes" : "❌ No"}
+                        <div key={loc} className="seo-card" role="listitem">
+                          <div className="seo-location">
+                            <MapPin aria-hidden="true" />
+                            {loc}
+                          </div>
+                          <div className="seo-row">
+                            <span className="seo-label">GBP Post</span>
+                            <span
+                              className={`seo-status ${entry?.gbpPost ? "active" : "inactive"}`}
+                            >
+                              {entry?.gbpPost ? "Active" : "—"}
+                            </span>
+                          </div>
+                          <div className="seo-row">
+                            <span className="seo-label">Reviews</span>
+                            <span>
+                              <span
+                                className="review-bar-wrapper"
+                                role="progressbar"
+                                aria-valuenow={entry?.reviewCount || 0}
+                                aria-valuemax={maxReviews}
+                                aria-label={`${entry?.reviewCount || 0} reviews`}
+                              >
+                                <span
+                                  className="review-bar"
+                                  style={{
+                                    width: `${((entry?.reviewCount || 0) / maxReviews) * 100}%`,
+                                  }}
+                                />
                               </span>
-                            </div>
-                            <div>
-                              <span style={{ color: "var(--muted)" }}>Reviews: </span>
-                              <span>{entry?.review_count ?? "—"}</span>
-                            </div>
+                              <span style={{ fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" }}>
+                                {entry?.reviewCount ?? 0}
+                              </span>
+                            </span>
                           </div>
                         </div>
                       );
@@ -290,37 +543,98 @@ export default function DashboardPage() {
                 </div>
               </div>
             </section>
+
+            {/* ── Intel Feed ───────────────────────────────────── */}
+            <section id="intel" aria-labelledby="intel-title">
+              <div className="card" style={{ animationDelay: "350ms" }}>
+                <div className="card-header">
+                  <span className="card-title" id="intel-title">
+                    <Brain aria-hidden="true" /> Intel Feed
+                  </span>
+                  <span className="card-badge">{intel.length} items</span>
+                </div>
+                <div className="card-body">
+                  {intel.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-icon">
+                        <Brain />
+                      </div>
+                      No intel items — agents are collecting data
+                    </div>
+                  ) : (
+                    <div className="intel-grid" role="list" aria-label="Intelligence feed items">
+                      {intel.slice(0, 10).map((item) => (
+                        <div key={item.id} className="intel-item" role="listitem">
+                          <div className="intel-topic">{item.topic}</div>
+                          <div className="intel-meta">
+                            <span
+                              className={`tag ${priorityClass(item.priority)}`}
+                            >
+                              {item.priority}
+                            </span>
+                            <span>{item.section}</span>
+                            {item.source && <span>· {item.source}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
           </>
         )}
 
-        {/* Article Detail Modal */}
-        <div className={`modal-overlay ${selectedItem ? "open" : ""}`} onClick={() => setSelectedItem(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+        {/* ── Detail Modal ─────────────────────────────────────── */}
+        <div
+          className={`modal-overlay ${selectedItem ? "open" : ""}`}
+          onClick={() => setSelectedItem(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            role="document"
+          >
             <div className="modal-header">
-              <div className="modal-title">{selectedItem?.pageTitle || "Article"}</div>
-              <button className="modal-close" onClick={() => setSelectedItem(null)}>×</button>
+              <div className="modal-title" id="modal-title">
+                {selectedItem?.pageTitle || "Article"}
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setSelectedItem(null)}
+                aria-label="Close dialog"
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
             </div>
             <div className="modal-body">
               {[
-                ["Keyword", selectedItem?.target_keyword],
+                ["Keyword", selectedItem?.targetKeyword],
                 ["Priority", selectedItem?.priority],
-                ["Status", selectedItem?.status],
-                ["Assigned", selectedItem?.assigned_to],
+                ["Status", selectedItem?.status ? stripEmoji(selectedItem.status) : undefined],
+                ["Assigned", selectedItem?.assignedTo],
                 ["Due", selectedItem?.due],
                 ["Notes", selectedItem?.notes],
-              ].filter(([, v]) => v).map(([label, value]) => (
-                <div key={label} className="modal-row">
-                  <div className="modal-label">{label}</div>
-                  <div className="modal-value">{value}</div>
-                </div>
-              ))}
+              ]
+                .filter(([, v]) => v)
+                .map(([label, value]) => (
+                  <div key={label} className="modal-row">
+                    <div className="modal-label">{label}</div>
+                    <div className="modal-value">{value}</div>
+                  </div>
+                ))}
             </div>
           </div>
         </div>
 
-        <div className="footer">
-          Ashridge Group SEO/GEO Operation &nbsp;|&nbsp; Neon PostgreSQL &nbsp;|&nbsp; Updated: {new Date().toLocaleTimeString()}
-        </div>
+        <footer className="footer">
+          Ashridge Group SEO/GEO Operations &nbsp;·&nbsp; Neon PostgreSQL
+          &nbsp;·&nbsp; Last updated:{" "}
+          <time>{new Date().toLocaleTimeString()}</time>
+        </footer>
       </main>
     </div>
   );
