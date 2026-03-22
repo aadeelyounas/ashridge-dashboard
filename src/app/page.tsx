@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   FileText,
@@ -175,12 +176,12 @@ function GeoRing({ score, max = 100 }: { score: number; max?: number }) {
 /* ── Main Component ──────────────────────────────────────────────────── */
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [pipeline, setPipeline] = useState<PipelineItem[]>([]);
   const [geo, setGeo] = useState<GeoScore[]>([]);
   const [agents, setAgents] = useState<AgentActivity[]>([]);
   const [seo, setSeo] = useState<LocalSeo[]>([]);
   const [intel, setIntel] = useState<IntelItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function fetchAll() {
@@ -221,72 +222,10 @@ export default function DashboardPage() {
   const maxReviews = Math.max(...seo.map((s) => s.reviewCount || 0), 1);
 
   return (
-    <div className="dashboard-layout">
-      {/* ── Sidebar ────────────────────────────────────────────── */}
-      <aside className="sidebar" aria-label="Main navigation">
-        <div className="sidebar-logo">
-          <div className="sidebar-logo-icon" aria-hidden="true">
-            <Building2 size={20} strokeWidth={1.75} />
-          </div>
-          <div>
-            <div className="sidebar-logo-text">Ashridge Group</div>
-            <div className="sidebar-logo-sub">SEO / GEO Dashboard</div>
-          </div>
-        </div>
-
-        <nav className="nav-section" aria-label="Operations navigation">
-          <div className="nav-label" id="nav-ops-label">Operations</div>
-          <div role="list" aria-labelledby="nav-ops-label">
-            <a href="#pipeline" className="nav-link active" role="listitem">
-              <ClipboardList aria-hidden="true" /> Content Pipeline
-            </a>
-            <a href="#geo" className="nav-link" role="listitem">
-              <Globe aria-hidden="true" /> GEO Score
-            </a>
-            <a href="#seo" className="nav-link" role="listitem">
-              <MapPin aria-hidden="true" /> Local SEO
-            </a>
-            <a href="#agents" className="nav-link" role="listitem">
-              <Bot aria-hidden="true" /> Agent Activity
-            </a>
-            <a href="#intel" className="nav-link" role="listitem">
-              <Brain aria-hidden="true" /> Intel Feed
-            </a>
-          </div>
-        </nav>
-
-        <div className="nav-section">
-          <div className="nav-label">Team</div>
-          {AGENTS.map((ag) => (
-            <div
-              key={ag.id}
-              className="nav-link"
-              style={{ opacity: 0.85, fontSize: 12 }}
-            >
-              <span
-                className="nav-dot"
-                style={{ background: ag.color }}
-                aria-hidden="true"
-              />
-              {ag.name} — {ag.role}
-            </div>
-          ))}
-        </div>
-
-        <div className="sidebar-footer">
-          <div className="status-indicator">
-            <span className="status-dot" aria-hidden="true" />
-            <span>Auto-refresh: 60s</span>
-          </div>
-          <div style={{ marginTop: 4 }}>Data: Neon PostgreSQL</div>
-        </div>
-      </aside>
-
-      {/* ── Main ───────────────────────────────────────────────── */}
-      <main className="main-content" id="main-content">
-        <div className="page-header">
-          <h1>Ashridge Dashboard</h1>
-          <p>
+    <>
+      <div className="page-header">
+        <h1>Ashridge Dashboard</h1>
+          <p suppressHydrationWarning>
             {new Date().toLocaleDateString("en-GB", {
               weekday: "long",
               year: "numeric",
@@ -370,11 +309,11 @@ export default function DashboardPage() {
                         {pipeline.map((item) => (
                           <tr
                             key={item.id}
-                            onClick={() => setSelectedItem(item)}
+                            onClick={() => router.push(`/post/${item.id}`)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                setSelectedItem(item);
+                                router.push(`/post/${item.id}`);
                               }
                             }}
                             tabIndex={0}
@@ -586,77 +525,11 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* ── Detail Modal ─────────────────────────────────────── */}
-        <div
-          className={`modal-overlay ${selectedItem ? "open" : ""}`}
-          onClick={() => setSelectedItem(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-title"
-        >
-          <div
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            role="document"
-          >
-            <div className="modal-header">
-              <div className="modal-title" id="modal-title">
-                {selectedItem?.pageTitle || "Article"}
-              </div>
-              <button
-                className="modal-close"
-                onClick={() => setSelectedItem(null)}
-                aria-label="Close dialog"
-              >
-                <X size={16} strokeWidth={2} />
-              </button>
-            </div>
-            <div className="modal-body">
-              {[
-                ["Keyword", selectedItem?.targetKeyword],
-                ["Priority", selectedItem?.priority],
-                ["Status", selectedItem?.status ? stripEmoji(selectedItem.status) : undefined],
-                ["Assigned", selectedItem?.assignedTo],
-                ["Due", selectedItem?.due],
-                ["Notes", selectedItem?.notes],
-              ]
-                .filter(([, v]) => v)
-                .map(([label, value]) => (
-                  <div key={label} className="modal-row">
-                    <div className="modal-label">{label}</div>
-                    <div className="modal-value">{value}</div>
-                  </div>
-                ))}
-
-              {selectedItem?.content && (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.8px" }}>Draft Content</div>
-                  <div style={{
-                    background: "var(--surface2)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "16px",
-                    fontSize: 13,
-                    lineHeight: 1.7,
-                    maxHeight: 400,
-                    overflowY: "auto",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}>
-                    {selectedItem.content}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         <footer className="footer">
           Ashridge Group SEO/GEO Operations &nbsp;·&nbsp; Neon PostgreSQL
           &nbsp;·&nbsp; Last updated:{" "}
-          <time>{new Date().toLocaleTimeString()}</time>
+          <time suppressHydrationWarning>{new Date().toLocaleTimeString()}</time>
         </footer>
-      </main>
-    </div>
+    </>
   );
 }
