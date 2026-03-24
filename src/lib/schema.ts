@@ -48,3 +48,21 @@ export const intelItems = pgTable("intel_items", {
   priority: text("priority").default("MED"),
   recordedAt: timestamp("recorded_at").defaultNow(),
 });
+
+export const pipelineItems = pgTable("pipeline_items", {
+  id: serial("id").primaryKey(),
+  draftSlug: text("draft_slug").notNull(),
+  draftTitle: text("draft_title"),
+  oliverStatus: text("oliver_status"),
+  sophieStatus: text("sophie_status"),
+  ariaStatus: text("aria_status"),
+  overallStatus: text("overall_status"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const agentStatus = pgTable("agent_status", {
+  id: serial("id").primaryKey(),
+  agentName: text("agent_name").notNull(),
+  lastAction: text("last_action"),
+  lastSeen: timestamp("last_seen").defaultNow(),
+});

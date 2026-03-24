@@ -4,7 +4,7 @@
  */
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { contentQueue, geoScores, agentActivity, localSeoTracker, intelItems } from "./schema";
+import { contentQueue, geoScores, agentActivity, localSeoTracker, intelItems, pipelineItems, agentStatus } from "./schema";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -186,6 +186,73 @@ async function ingestIntel() {
   console.log(`  Intel: parsed ${lines.filter((l) => l.match(/^##\s+\d+\./)).length} sections`);
 }
 
+// ── Ingest: Pipeline ─────────────────────────────────────────────────────────
+
+async function ingestPipeline() {
+  const md = read("intel/PIPELINE.md");
+  if (!md) { console.log("No PIPELINE.md found"); return; }
+
+  await db.delete(pipelineItems);
+
+  const lines = md.split("\n");
+  let inTable = false;
+  let headers: string[] = [];
+
+  for (const line of lines) {
+    if (line.includes("| Draft |")) {
+      inTable = true;
+      headers = line.split("|").map((h) => h.trim()).filter(Boolean);
+      continue;
+    }
+    if (inTable && line.startsWith("|---")) continue;
+    if (inTable && line.startsWith("|") && !line.startsWith("|---")) {
+      const cells = line.split("|").map((c) => c.trim()).filter(Boolean);
+      if (cells.length < 4) continue;
+
+      // Map columns: Draft, Oliver, Sophie, Aria, Status
+      const draft = cells[0] || "";
+      const oliver = cells[1] || "";
+      const sophie = cells[2] || "";
+      const aria = cells[3] || "";
+      const status = cells[4] || "";
+
+      await db.insert(pipelineItems).values({
+        draftSlug: draft,
+        draftTitle: draft.replace(/-/g, " ").replace(/\d{4}-\d{2}-\d{2}-/g, ""),
+        oliverStatus: oliver,
+        sophieStatus: sophie,
+        ariaStatus: aria,
+        overallStatus: status,
+      });
+    }
+  }
+  console.log(`  Pipeline: ingested active drafts`);
+}
+
+// ── Ingest: Agent Status ─────────────────────────────────────────────────────
+
+async function ingestAgentStatus() {
+  const md = read("intel/STATUS.md");
+  if (!md) { console.log("No STATUS.md found"); return; }
+
+  await db.delete(agentStatus);
+
+  const lines = md.split("\n");
+  for (const line of lines) {
+    // Pattern: "AgentName | YYYY-MM-DD HH:MM | last action"
+    const m = line.match(/^\|\s*(.+?)\s*\|\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*\|\s*(.+?)\s*\|?\s*$/);
+    if (m) {
+      const [, agent, timestamp, action] = m;
+      await db.insert(agentStatus).values({
+        agentName: agent.trim(),
+        lastAction: action.trim(),
+        lastSeen: new Date(timestamp),
+      });
+    }
+  }
+  console.log(`  Agent status: updated`);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -195,6 +262,8 @@ async function main() {
   await ingestGeo();
   await ingestLocalSeo();
   await ingestIntel();
+  await ingestPipeline();
+  await ingestAgentStatus();
 
   // Log this run
   await db.insert(agentActivity).values({

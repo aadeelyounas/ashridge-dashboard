@@ -975,6 +975,47 @@ button {
   stroke-width: 1.5;
 }
 
+/* ── Agent Status Grid ────────────────────────────────────────────── */
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.agent-status-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-bottom: 4px;
+}
+
+.agent-status-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.agent-status-action {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.agent-status-time {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }

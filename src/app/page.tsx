@@ -30,6 +30,17 @@ interface PipelineItem {
   content?: string;
 }
 
+interface PipelineEntry {
+  id: number;
+  draftSlug: string;
+  draftTitle: string;
+  oliverStatus: string;
+  sophieStatus: string;
+  ariaStatus: string;
+  overallStatus: string;
+  updatedAt: string;
+}
+
 interface GeoScore {
   id: number;
   location: string;
@@ -45,6 +56,13 @@ interface AgentActivity {
   action: string;
   details: string;
   ranAt: string;
+}
+
+interface AgentStatusEntry {
+  id: number;
+  agentName: string;
+  lastAction: string;
+  lastSeen: string;
 }
 
 interface LocalSeo {
@@ -68,14 +86,13 @@ interface IntelItem {
 /* ── Constants ──────────────────────────────────────────────────────── */
 
 const AGENTS = [
-  { id: "victoria", name: "Victoria", role: "SEO & GEO Lead", color: "#2563eb" },
   { id: "atlas", name: "Atlas", role: "Topical Map Builder", color: "#8b5cf6" },
   { id: "quinn", name: "Quinn", role: "Query Gap Analyst", color: "#f59e0b" },
-  { id: "aria", name: "Aria", role: "Content Auditor", color: "#22c55e" },
-  { id: "oliver", name: "Oliver", role: "Content Writer", color: "#ef4444" },
-  { id: "sophie", name: "Sophie", role: "Brand Voice", color: "#ec4899" },
   { id: "grace", name: "Grace", role: "GEO / AI Visibility", color: "#3b82f6" },
   { id: "marcus", name: "Marcus", role: "Local SEO", color: "#f97316" },
+  { id: "oliver", name: "Oliver", role: "Content Writer", color: "#ef4444" },
+  { id: "sophie", name: "Sophie", role: "Brand Voice", color: "#ec4899" },
+  { id: "aria", name: "Aria", role: "Content Auditor", color: "#22c55e" },
 ];
 
 const LOCATIONS = [
@@ -178,24 +195,30 @@ function GeoRing({ score, max = 100 }: { score: number; max?: number }) {
 export default function DashboardPage() {
   const router = useRouter();
   const [pipeline, setPipeline] = useState<PipelineItem[]>([]);
+  const [pipelineEntries, setPipelineEntries] = useState<PipelineEntry[]>([]);
   const [geo, setGeo] = useState<GeoScore[]>([]);
   const [agents, setAgents] = useState<AgentActivity[]>([]);
+  const [agentStatus, setAgentStatus] = useState<AgentStatusEntry[]>([]);
   const [seo, setSeo] = useState<LocalSeo[]>([]);
   const [intel, setIntel] = useState<IntelItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function fetchAll() {
     try {
-      const [p, g, a, s, i] = await Promise.all([
+      const [pData, g, aData, s, i] = await Promise.all([
         fetch("/api/pipeline").then((r) => r.json()),
         fetch("/api/geo").then((r) => r.json()),
         fetch("/api/agents").then((r) => r.json()),
         fetch("/api/seo").then((r) => r.json()),
         fetch("/api/intel").then((r) => r.json()),
       ]);
-      setPipeline(Array.isArray(p) ? p : []);
+      // pipeline API returns { pipeline, queue }
+      setPipeline(Array.isArray(pData.queue) ? pData.queue : Array.isArray(pData) ? pData : []);
+      setPipelineEntries(Array.isArray(pData.pipeline) ? pData.pipeline : []);
       setGeo(Array.isArray(g) ? g : []);
-      setAgents(Array.isArray(a) ? a : []);
+      // agents API returns { activity, status }
+      setAgents(Array.isArray(aData.activity) ? aData.activity : Array.isArray(aData) ? aData : []);
+      setAgentStatus(Array.isArray(aData.status) ? aData.status : []);
       setSeo(Array.isArray(s) ? s : []);
       setIntel(Array.isArray(i) ? i : []);
     } catch (e) {
@@ -278,6 +301,73 @@ export default function DashboardPage() {
                 <div className="kpi-label">GEO Score</div>
               </div>
             </div>
+
+            {/* ── Agent Status ──────────────────────────────── */}
+            {agentStatus.length > 0 && (
+              <section aria-labelledby="agent-status-title">
+                <div className="card" style={{ animationDelay: "50ms", marginBottom: 24 }}>
+                  <div className="card-header">
+                    <span className="card-title" id="agent-status-title">
+                      <Bot aria-hidden="true" /> Agent Status
+                    </span>
+                  </div>
+                  <div className="card-body">
+                    <div className="agent-grid" role="list">
+                      {agentStatus.map((ag) => (
+                        <div key={ag.id} className="agent-status-card" role="listitem">
+                          <div
+                            className="agent-status-dot"
+                            style={{ background: AGENTS.find(a => a.name.toLowerCase() === ag.agentName.toLowerCase())?.color || "#888" }}
+                            aria-hidden="true"
+                          />
+                          <div className="agent-status-name">{ag.agentName}</div>
+                          <div className="agent-status-action">{ag.lastAction || "—"}</div>
+                          <div className="agent-status-time">{ag.lastSeen ? timeAgo(ag.lastSeen) : ""}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* ── Content Pipeline (Full Pipeline View) ─────── */}
+            {pipelineEntries.length > 0 && (
+              <section aria-labelledby="full-pipeline-title">
+                <div className="card" style={{ animationDelay: "75ms", marginBottom: 24 }}>
+                  <div className="card-header">
+                    <span className="card-title" id="full-pipeline-title">
+                      <ClipboardList aria-hidden="true" /> Content Pipeline — Oliver → Sophie → Aria
+                    </span>
+                    <span className="card-badge">{pipelineEntries.length} drafts</span>
+                  </div>
+                  <div className="card-body" style={{ padding: 0 }}>
+                    <table className="pipeline-table" aria-label="Full pipeline stages">
+                      <thead>
+                        <tr>
+                          <th scope="col">Draft</th>
+                          <th scope="col">Oliver</th>
+                          <th scope="col">Sophie</th>
+                          <th scope="col">Aria</th>
+                          <th scope="col">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pipelineEntries.map((item) => (
+                          <tr key={item.id}>
+                            <td><div className="page-title">{item.draftTitle || item.draftSlug}</div></td>
+                            <td><span className={`stage ${stageClass(item.oliverStatus || "")}`}>{stripEmoji(item.oliverStatus || "—")}</span></td>
+                            <td><span className={`stage ${stageClass(item.sophieStatus || "")}`}>{stripEmoji(item.sophieStatus || "—")}</span></td>
+                            <td><span className={`stage ${stageClass(item.ariaStatus || "")}`}>{stripEmoji(item.ariaStatus || "—")}</span></td>
+                            <td><span className={`tag ${priorityClass(item.overallStatus || "")}`}>{stripEmoji(item.overallStatus || "—")}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* ── Content Pipeline ────────────────────────────── */}
             <section id="pipeline" aria-labelledby="pipeline-title">
