@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { contentQueue } from "@/lib/schema";
+import { pipelineItems } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -7,6 +8,10 @@ import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import { ArrowLeft, Clock, User, Target, Bookmark } from "lucide-react";
 import "@/app/globals.css";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+
+const DRAFTS_ROOT = "/root/.openclaw/workspace/ashridge/memory/drafts";
 
 function priorityClass(p: string) {
   const s = p.toLowerCase();
@@ -15,7 +20,6 @@ function priorityClass(p: string) {
   return "tag-med";
 }
 
-/** Strip emoji characters from database strings (no-emoji-icons rule) */
 function stripEmoji(str: string) {
   return str
     .replace(
@@ -25,51 +29,109 @@ function stripEmoji(str: string) {
     .trim();
 }
 
+function slugToDraftPath(slug: string): string | null {
+  // Try exact slug → .md
+  const exact = join(DRAFTS_ROOT, `${slug}.md`);
+  if (existsSync(exact)) return exact;
+  // Try without date prefix: strip leading YYYY-MM-DD- from slug
+  const noDate = slug.replace(/^\d{4}-\d{2}-\d{2}-/, "");
+  const withoutDate = join(DRAFTS_ROOT, `${noDate}.md`);
+  if (existsSync(withoutDate)) return withoutDate;
+  return null;
+}
+
 export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  // Try numeric ID first (content_queue rows)
-  const postId = parseInt(id, 10);
-  let post: typeof contentQueue.$inferSelect | null = null;
+  let pageTitle = "";
+  let targetKeyword = "";
+  let status = "";
+  let assignedTo = "";
+  let due = "";
+  let priority = "";
+  let content: string | null = null;
+  let source = "";
 
+  // 1. Try numeric ID in content_queue
+  const postId = parseInt(id, 10);
   if (!isNaN(postId)) {
     const rows = await db.select().from(contentQueue).where(eq(contentQueue.id, postId)).limit(1);
-    post = rows[0] || null;
+    if (rows[0]) {
+      const row = rows[0];
+      pageTitle = row.pageTitle || "";
+      targetKeyword = row.targetKeyword || "";
+      status = row.status || "";
+      assignedTo = row.assignedTo || "";
+      due = row.due || "";
+      priority = row.priority || "";
+      content = row.content || null;
+      source = "database";
+    }
   }
 
-  // Fallback: slug-based lookup from pipeline_items
-  if (!post) {
-    const slug = id;
-    const slugified = (s: string) => s.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  // 2. Fallback: slug-based lookup in content_queue
+  if (!pageTitle) {
+    const slug = id.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const noDateSlug = slug.replace(/^\d{4}-\d{2}-\d{2}-/, "");
     const all = await db.select().from(contentQueue).limit(500);
-    post = all.find(row =>
-      slugified(row.pageTitle || "") === slug ||
-      slugified(row.targetKeyword || "") === slug
-    ) || null;
+    const match = all.find(row => {
+      const t = (row.pageTitle || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      const k = (row.targetKeyword || "").toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      return t === slug || t === noDateSlug || k === slug || k === noDateSlug;
+    });
+    if (match) {
+      pageTitle = match.pageTitle || "";
+      targetKeyword = match.targetKeyword || "";
+      status = match.status || "";
+      assignedTo = match.assignedTo || "";
+      due = match.due || "";
+      priority = match.priority || "";
+      content = match.content || null;
+      source = "database-slug";
+    }
   }
 
-  if (!post) return notFound();
+  // 3. Final fallback: read draft file from disk
+  if (!content) {
+    const draftPath = slugToDraftPath(id);
+    if (draftPath) {
+      try {
+        content = readFileSync(draftPath, "utf8");
+        pageTitle = pageTitle || id.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/-/g, " ");
+        status = "Draft on disk";
+        source = "filesystem";
+      } catch {
+        // file unreadable
+      }
+    }
+  }
+
+  if (!pageTitle && !content) return notFound();
 
   return (
     <div style={{ animation: "fadeIn 0.4s ease-out" }}>
       <div className="page-header" style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
-        <Link 
-          href="/" 
-          className="back-link" 
+        <Link
+          href="/"
+          className="back-link"
           style={{ marginBottom: 0, padding: "8px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}
           aria-label="Back to dashboard"
         >
           <ArrowLeft size={18} strokeWidth={2} />
         </Link>
         <div>
-          <h1 style={{ marginBottom: "var(--space-1)" }}>{post.pageTitle || "Draft Content"}</h1>
+          <h1 style={{ marginBottom: "var(--space-1)" }}>{pageTitle || "Draft Content"}</h1>
           <p style={{ display: "flex", gap: "var(--space-4)", alignItems: "center" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-              <Target size={14} /> {post.targetKeyword}
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-              <User size={14} /> {post.assignedTo || "Unassigned"}
-            </span>
+            {targetKeyword && (
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <Target size={14} /> {targetKeyword}
+              </span>
+            )}
+            {assignedTo && (
+              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <User size={14} /> {assignedTo}
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -79,32 +141,33 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <div>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>Generated Content</h2>
             <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-              Status: <strong style={{ color: "var(--text-primary)" }}>{post.status ? stripEmoji(post.status) : "Not started"}</strong>
+              Status: <strong style={{ color: "var(--text-primary)" }}>{status ? stripEmoji(status) : "Not started"}</strong>
+              {source && <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-muted)" }}>({source})</span>}
             </div>
           </div>
           <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center" }}>
-            {post.due && (
+            {due && (
               <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: 13, color: "var(--text-muted)" }}>
-                <Clock size={14} /> Due {post.due}
+                <Clock size={14} /> Due {due}
               </span>
             )}
-            <span className={`tag ${priorityClass(post.priority || "")}`}>
-              {post.priority || "MED"} Priority
-            </span>
+            {priority && (
+              <span className={`tag ${priorityClass(priority)}`}>
+                {priority} Priority
+              </span>
+            )}
           </div>
         </div>
-        
+
         <div className="card-body">
           <article className="markdown-body">
-            {post.content ? (
+            {content ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {post.content}
+                {content}
               </ReactMarkdown>
             ) : (
               <div className="empty-state">
-                <div className="empty-icon">
-                  <Bookmark />
-                </div>
+                <div className="empty-icon"><Bookmark /></div>
                 No content drafted yet.
               </div>
             )}
