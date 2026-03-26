@@ -247,7 +247,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="page-header">
-        <h1>Ashridge Dashboard</h1>
+        <h1>Ashridge — Oliver → Sophie → Aria → Victoria → Adeel → WordPress</h1>
           <p suppressHydrationWarning>
             {new Date().toLocaleDateString("en-GB", {
               weekday: "long",
@@ -331,81 +331,41 @@ export default function DashboardPage() {
               </section>
             )}
 
-            {/* ── Content Pipeline (Full Pipeline View) ─────── */}
-            {pipelineEntries.length > 0 && (
-              <section aria-labelledby="full-pipeline-title">
-                <div className="card" style={{ animationDelay: "75ms", marginBottom: 24 }}>
-                  <div className="card-header">
-                    <span className="card-title" id="full-pipeline-title">
-                      <ClipboardList aria-hidden="true" /> Content Pipeline — Oliver → Sophie → Aria
-                    </span>
-                    <span className="card-badge">{pipelineEntries.length} drafts</span>
-                  </div>
-                  <div className="card-body" style={{ padding: 0 }}>
-                    <table className="pipeline-table" aria-label="Full pipeline stages">
+            {/* ── Content Pipeline (unified — click any row to see content) ── */}
+            <section aria-labelledby="pipeline-title">
+              <div className="card" style={{ animationDelay: "75ms" }}>
+                <div className="card-header">
+                  <span className="card-title" id="pipeline-title">
+                    <ClipboardList aria-hidden="true" />
+                    Content Pipeline — Oliver → Sophie → Aria → Victoria → Adeel → WordPress
+                  </span>
+                  <span className="card-badge">
+                    {pipelineEntries.length || pipeline.length} drafts
+                  </span>
+                </div>
+                <div className="card-body" style={{ padding: 0 }}>
+                  {pipelineEntries.length === 0 && pipeline.length === 0 ? (
+                    <div className="empty-state">
+                      <div className="empty-icon"><Inbox /></div>
+                      No pages in queue — Victoria sets priorities each Monday
+                    </div>
+                  ) : (
+                    <table className="pipeline-table" aria-label="Full content pipeline">
                       <thead>
                         <tr>
-                          <th scope="col">Draft</th>
+                          <th scope="col">Page / Draft</th>
                           <th scope="col">Oliver</th>
                           <th scope="col">Sophie</th>
                           <th scope="col">Aria</th>
                           <th scope="col">Victoria</th>
-                          <th scope="col">Overall / WordPress</th>
+                          <th scope="col">Status</th>
                         </tr>
                       </thead>
                       <tbody>
+                        {/* Full pipeline rows (from PIPELINE.md) — clickable */}
                         {pipelineEntries.map((item) => (
-                          <tr key={item.id}>
-                            <td><div className="page-title">{item.draftTitle || item.draftSlug}</div></td>
-                            <td><span className={`stage ${stageClass(item.oliverStatus || "")}`}>{stripEmoji(item.oliverStatus || "—")}</span></td>
-                            <td><span className={`stage ${stageClass(item.sophieStatus || "")}`}>{stripEmoji(item.sophieStatus || "—")}</span></td>
-                            <td><span className={`stage ${stageClass(item.ariaStatus || "")}`}>{stripEmoji(item.ariaStatus || "—")}</span></td>
-                            <td><span className={`stage ${stageClass(item.victoriaStatus || "")}`}>{stripEmoji(item.victoriaStatus || "—")}</span></td>
-                            <td>
-                              {item.wpPublishedAt
-                                ? <span className="tag" style={{ background: "#22c55e", color: "#fff" }}>🟢 Live on WordPress</span>
-                                : <span className={`tag ${priorityClass(item.overallStatus || "")}`}>{stripEmoji(item.overallStatus || "—")}</span>
-                              }
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* ── Content Pipeline ────────────────────────────── */}
-            <section id="pipeline" aria-labelledby="pipeline-title">
-              <div className="card" style={{ animationDelay: "100ms" }}>
-                <div className="card-header">
-                  <span className="card-title" id="pipeline-title">
-                    <ClipboardList aria-hidden="true" /> Content Pipeline
-                  </span>
-                  <span className="card-badge">{pipeline.length} pages</span>
-                </div>
-                <div className="card-body" style={{ padding: 0 }}>
-                  {pipeline.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-icon">
-                        <Inbox />
-                      </div>
-                      No pages in queue — Victoria sets priorities each Monday
-                    </div>
-                  ) : (
-                    <table className="pipeline-table" aria-label="Content pipeline items">
-                      <thead>
-                        <tr>
-                          <th scope="col">Page</th>
-                          <th scope="col">Priority</th>
-                          <th scope="col">Stage</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pipeline.map((item) => (
                           <tr
-                            key={item.id}
+                            key={`entry-${item.id}`}
                             onClick={() => router.push(`/post/${item.id}`)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
@@ -415,32 +375,56 @@ export default function DashboardPage() {
                             }}
                             tabIndex={0}
                             role="button"
-                            aria-label={`View details for ${item.pageTitle || "untitled"}`}
+                            aria-label={`View ${item.draftTitle || item.draftSlug}`}
+                            style={{ cursor: "pointer" }}
                           >
                             <td>
-                              <div className="page-title">
-                                {item.pageTitle || "(untitled)"}
-                              </div>
+                              <div className="page-title">{item.draftTitle || item.draftSlug}</div>
                               <div className="page-keyword">
-                                {item.targetKeyword}
+                                {pipeline.find(p => p.id === item.id)?.targetKeyword}
                               </div>
                             </td>
+                            <td><span className={`stage ${stageClass(item.oliverStatus || "")}`}>{stripEmoji(item.oliverStatus || "—")}</span></td>
+                            <td><span className={`stage ${stageClass(item.sophieStatus || "")}`}>{stripEmoji(item.sophieStatus || "—")}</span></td>
+                            <td><span className={`stage ${stageClass(item.ariaStatus || "")}`}>{stripEmoji(item.ariaStatus || "—")}</span></td>
+                            <td><span className={`stage ${stageClass(item.victoriaStatus || "")}`}>{stripEmoji(item.victoriaStatus || "—")}</span></td>
                             <td>
-                              <span
-                                className={`tag ${priorityClass(item.priority)}`}
-                              >
-                                {item.priority}
-                              </span>
-                            </td>
-                            <td>
-                              <span
-                                className={`stage ${stageClass(item.status)}`}
-                              >
-                                {stripEmoji(item.status)}
-                              </span>
+                              {item.wpPublishedAt
+                                ? <span className="tag" style={{ background: "#22c55e", color: "#fff" }}>🟢 Live</span>
+                                : <span className={`tag ${priorityClass(item.overallStatus || "")}`}>{stripEmoji(item.overallStatus || "—")}</span>
+                              }
                             </td>
                           </tr>
                         ))}
+                        {/* Queue rows not yet in pipeline (from content_queue, fallback) */}
+                        {pipeline
+                          .filter(p => !pipelineEntries.some(e => e.id === p.id))
+                          .map((item) => (
+                            <tr
+                              key={`queue-${item.id}`}
+                              onClick={() => router.push(`/post/${item.id}`)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  router.push(`/post/${item.id}`);
+                                }
+                              }}
+                              tabIndex={0}
+                              role="button"
+                              aria-label={`View ${item.pageTitle || "untitled"}`}
+                              style={{ cursor: "pointer" }}
+                            >
+                              <td>
+                                <div className="page-title">{item.pageTitle || "(untitled)"}</div>
+                                <div className="page-keyword">{item.targetKeyword}</div>
+                              </td>
+                              <td><span className="stage stage-queuing">queued</span></td>
+                              <td>—</td>
+                              <td>—</td>
+                              <td>—</td>
+                              <td><span className={`tag ${priorityClass(item.priority)}`}>{item.priority}</span></td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   )}
