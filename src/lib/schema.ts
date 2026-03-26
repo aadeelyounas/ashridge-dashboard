@@ -56,7 +56,9 @@ export const pipelineItems = pgTable("pipeline_items", {
   oliverStatus: text("oliver_status"),
   sophieStatus: text("sophie_status"),
   ariaStatus: text("aria_status"),
+  victoriaStatus: text("victoria_status"),
   overallStatus: text("overall_status"),
+  wpPublishedAt: timestamp("wp_published_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

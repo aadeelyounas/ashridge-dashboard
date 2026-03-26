@@ -194,14 +194,24 @@ async function ingestPipeline() {
 
   await db.delete(pipelineItems);
 
+  // Detect WP-published drafts by checking published-ready/
+  const pubDir = path.join(ASHRIDGE_ROOT, "memory/published-ready");
+  const publishedSlugs = new Set<string>();
+  try {
+    for (const f of fs.readdirSync(pubDir)) {
+      if (f.endsWith(".md")) {
+        const slug = f.replace(/\.md$/, "");
+        publishedSlugs.add(slug);
+      }
+    }
+  } catch { /* dir doesn't exist yet */ }
+
   const lines = md.split("\n");
   let inTable = false;
-  let headers: string[] = [];
 
   for (const line of lines) {
     if (line.includes("| Draft |")) {
       inTable = true;
-      headers = line.split("|").map((h) => h.trim()).filter(Boolean);
       continue;
     }
     if (inTable && line.startsWith("|---")) continue;
@@ -209,20 +219,29 @@ async function ingestPipeline() {
       const cells = line.split("|").map((c) => c.trim()).filter(Boolean);
       if (cells.length < 4) continue;
 
-      // Map columns: Draft, Oliver, Sophie, Aria, Status
-      const draft = cells[0] || "";
-      const oliver = cells[1] || "";
-      const sophie = cells[2] || "";
-      const aria = cells[3] || "";
-      const status = cells[4] || "";
+      // Map columns: Draft, Oliver, Sophie, Aria, Victoria, Status
+      const draft   = cells[0] || "";
+      const oliver  = cells[1] || "";
+      const sophie  = cells[2] || "";
+      const aria    = cells[3] || "";
+      const victoria = cells[4] || "";
+      const status  = cells[5] || "";
+
+      // Derive slug from filename: 2026-03-25-what-is-manned-guarding.md
+      const slug = draft.replace(/\.md$/, "");
+      const isPublished = publishedSlugs.has(slug) ||
+        status.toLowerCase().includes("published") ||
+        status.toLowerCase().includes("live");
 
       await db.insert(pipelineItems).values({
-        draftSlug: draft,
-        draftTitle: draft.replace(/-/g, " ").replace(/\d{4}-\d{2}-\d{2}-/g, ""),
+        draftSlug:    slug,
+        draftTitle:   draft.replace(/-/g, " ").replace(/\d{4}-\d{2}-\d{2}-/g, ""),
         oliverStatus: oliver,
         sophieStatus: sophie,
-        ariaStatus: aria,
+        ariaStatus:   aria,
+        victoriaStatus: victoria,
         overallStatus: status,
+        wpPublishedAt: isPublished ? new Date() : null,
       });
     }
   }

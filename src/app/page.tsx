@@ -37,7 +37,9 @@ interface PipelineEntry {
   oliverStatus: string;
   sophieStatus: string;
   ariaStatus: string;
+  victoriaStatus: string;
   overallStatus: string;
+  wpPublishedAt: string | null;
   updatedAt: string;
 }
 
@@ -118,7 +120,7 @@ function stripEmoji(str: string) {
 
 function stageClass(status: string) {
   const s = status.toLowerCase();
-  if (s.includes("publish")) return "stage-published";
+  if (s.includes("publish") || s.includes("live")) return "stage-published";
   if (
     s.includes("adeel") ||
     s.includes("victoria") ||
@@ -153,8 +155,6 @@ function timeAgo(dateStr: string) {
   const days = Math.floor(hrs / 24);
   return `${days}d ago`;
 }
-
-/* ── GEO Progress Ring ───────────────────────────────────────────────── */
 
 function GeoRing({ score, max = 100 }: { score: number; max?: number }) {
   const radius = 66;
@@ -349,7 +349,8 @@ export default function DashboardPage() {
                           <th scope="col">Oliver</th>
                           <th scope="col">Sophie</th>
                           <th scope="col">Aria</th>
-                          <th scope="col">Status</th>
+                          <th scope="col">Victoria</th>
+                          <th scope="col">Overall / WordPress</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -359,7 +360,13 @@ export default function DashboardPage() {
                             <td><span className={`stage ${stageClass(item.oliverStatus || "")}`}>{stripEmoji(item.oliverStatus || "—")}</span></td>
                             <td><span className={`stage ${stageClass(item.sophieStatus || "")}`}>{stripEmoji(item.sophieStatus || "—")}</span></td>
                             <td><span className={`stage ${stageClass(item.ariaStatus || "")}`}>{stripEmoji(item.ariaStatus || "—")}</span></td>
-                            <td><span className={`tag ${priorityClass(item.overallStatus || "")}`}>{stripEmoji(item.overallStatus || "—")}</span></td>
+                            <td><span className={`stage ${stageClass(item.victoriaStatus || "")}`}>{stripEmoji(item.victoriaStatus || "—")}</span></td>
+                            <td>
+                              {item.wpPublishedAt
+                                ? <span className="tag" style={{ background: "#22c55e", color: "#fff" }}>🟢 Live on WordPress</span>
+                                : <span className={`tag ${priorityClass(item.overallStatus || "")}`}>{stripEmoji(item.overallStatus || "—")}</span>
+                              }
+                            </td>
                           </tr>
                         ))}
                       </tbody>
