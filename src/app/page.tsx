@@ -118,6 +118,10 @@ function stripEmoji(str: string) {
     .trim();
 }
 
+function slugOf(s: string) {
+  return s.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
 function stageClass(status: string) {
   const s = status.toLowerCase();
   if (s.includes("publish") || s.includes("live")) return "stage-published";
@@ -362,15 +366,17 @@ export default function DashboardPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {/* Full pipeline rows (from PIPELINE.md) — clickable */}
-                        {pipelineEntries.map((item) => (
+                        {/* Full pipeline rows (from PIPELINE.md) — skip "old" duplicates */}
+                        {pipelineEntries
+                          .filter(item => !item.oliverStatus.toLowerCase().includes("old"))
+                          .map((item) => (
                           <tr
                             key={`entry-${item.id}`}
-                            onClick={() => router.push(`/post/${item.id}`)}
+                            onClick={() => router.push(`/post/${item.draftSlug}`)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                router.push(`/post/${item.id}`);
+                                router.push(`/post/${item.draftSlug}`);
                               }
                             }}
                             tabIndex={0}
@@ -381,7 +387,10 @@ export default function DashboardPage() {
                             <td>
                               <div className="page-title">{item.draftTitle || item.draftSlug}</div>
                               <div className="page-keyword">
-                                {pipeline.find(p => p.id === item.id)?.targetKeyword}
+                                {pipeline.find(p =>
+                                  slugOf(p.pageTitle || "") === slugOf(item.draftTitle || "") ||
+                                  slugOf(p.targetKeyword || "") === slugOf(item.draftTitle || "")
+                                )?.targetKeyword}
                               </div>
                             </td>
                             <td><span className={`stage ${stageClass(item.oliverStatus || "")}`}>{stripEmoji(item.oliverStatus || "—")}</span></td>
@@ -398,15 +407,18 @@ export default function DashboardPage() {
                         ))}
                         {/* Queue rows not yet in pipeline (from content_queue, fallback) */}
                         {pipeline
-                          .filter(p => !pipelineEntries.some(e => e.id === p.id))
+                          .filter(p => {
+                            const pq = slugOf(p.pageTitle || "");
+                            return !pipelineEntries.some(e => slugOf(e.draftTitle || "") === pq);
+                          })
                           .map((item) => (
                             <tr
                               key={`queue-${item.id}`}
-                              onClick={() => router.push(`/post/${item.id}`)}
+                              onClick={() => router.push(`/post/${slugOf(item.pageTitle || "")}`)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
                                   e.preventDefault();
-                                  router.push(`/post/${item.id}`);
+                                  router.push(`/post/${slugOf(item.pageTitle || "")}`);
                                 }
                               }}
                               tabIndex={0}

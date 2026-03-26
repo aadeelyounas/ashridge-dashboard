@@ -27,15 +27,26 @@ function stripEmoji(str: string) {
 
 export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  
-  const postId = parseInt(id, 10);
-  if (isNaN(postId)) return notFound();
 
-  const [post] = await db
-    .select()
-    .from(contentQueue)
-    .where(eq(contentQueue.id, postId))
-    .limit(1);
+  // Try numeric ID first (content_queue rows)
+  const postId = parseInt(id, 10);
+  let post: typeof contentQueue.$inferSelect | null = null;
+
+  if (!isNaN(postId)) {
+    const rows = await db.select().from(contentQueue).where(eq(contentQueue.id, postId)).limit(1);
+    post = rows[0] || null;
+  }
+
+  // Fallback: slug-based lookup from pipeline_items
+  if (!post) {
+    const slug = id;
+    const slugified = (s: string) => s.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const all = await db.select().from(contentQueue).limit(500);
+    post = all.find(row =>
+      slugified(row.pageTitle || "") === slug ||
+      slugified(row.targetKeyword || "") === slug
+    ) || null;
+  }
 
   if (!post) return notFound();
 
