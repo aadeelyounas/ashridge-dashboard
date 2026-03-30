@@ -98,12 +98,7 @@ const AGENTS = [
 ];
 
 const LOCATIONS = [
-  "London",
-  "Milton Keynes",
-  "Weybridge",
-  "Basingstoke",
-  "Manchester",
-  "Scotland",
+  "Leighton Buzzard (HQ)",
 ];
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */

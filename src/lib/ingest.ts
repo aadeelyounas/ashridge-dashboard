@@ -19,7 +19,7 @@ const db = drizzle(sql);
 
 const ASHRIDGE_ROOT = "/root/.openclaw/workspace/ashridge";
 const SQUAD_ROOT = "/root/.openclaw/workspace";
-const LOCATIONS = ["London", "Milton Keynes", "Weybridge", "Basingstoke", "Manchester", "Scotland"];
+const LOCATIONS = ["Leighton Buzzard (HQ)"];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
