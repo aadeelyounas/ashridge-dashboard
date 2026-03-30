@@ -1,37 +1,38 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createHash } from "crypto";
-
-const PASSWORD = "Ashridge2026!";
-const COOKIE_NAME = "dash_auth";
-
-function isAuthenticated(request: NextRequest) {
-  return request.cookies.get(COOKIE_NAME)?.value === "authenticated";
-}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow static files, Next.js internals, and the login page through
+  // Allow Next.js internals and login page through
   if (
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
     pathname === "/login" ||
-    pathname.includes(".") // any file extension
+    pathname.startsWith("/favicon") ||
+    pathname.includes(".")
   ) {
     return NextResponse.next();
   }
 
-  if (isAuthenticated(request)) {
+  // Allow API routes through (auth is handled there)
+  if (pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
-  // Not authenticated → send to login
+  // Check auth cookie
+  const cookie = request.cookies.get("dash_auth");
+  if (cookie?.value === "authenticated") {
+    return NextResponse.next();
+  }
+
+  // Redirect to login, preserving intended destination
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("from", pathname);
+  if (pathname !== "/") {
+    loginUrl.searchParams.set("from", pathname);
+  }
   return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: ["/((?!login|_next/static|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|favicon.ico).*)"],
 };
